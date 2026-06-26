@@ -109,7 +109,11 @@ export default function App() {
 
   return (
     // Clicking the dimmed backdrop (outside the card) dismisses the palette.
-    <div className="overlay" onMouseDown={(e) => e.target === e.currentTarget && close()}>
+    <div
+      className="overlay"
+      data-clickable
+      onMouseDown={(e) => e.target === e.currentTarget && close()}
+    >
       <div className="card" onKeyDown={onKeyDown}>
         <div className="search-row">
           <span className="search-icon" aria-hidden>
@@ -121,6 +125,7 @@ export default function App() {
             type="text"
             autoFocus
             spellCheck={false}
+            data-clickable
             placeholder={
               scope === "bound"
                 ? "Search commands with a shortcut…"
@@ -135,6 +140,7 @@ export default function App() {
           {query ? (
             <button
               className="clear"
+              data-clickable
               tabIndex={-1}
               onMouseDown={(e) => {
                 e.preventDefault();
@@ -162,6 +168,7 @@ export default function App() {
               <li
                 key={entry.cmd.id}
                 className={"row" + (entry.index === active ? " active" : "")}
+                data-clickable
                 onMouseMove={() => setActive(entry.index)}
                 onClick={() => runAt(entry.index)}
               >

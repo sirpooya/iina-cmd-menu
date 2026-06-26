@@ -1,32 +1,36 @@
 // iina-cmd-menu — main entry
 //
-// Registers a Cmd+K menu item that toggles a StandaloneWindow command palette,
-// builds the command list from the configured search scope, and runs the
-// command the webview selects.
+// Registers a Cmd+K menu item that toggles a command palette rendered as a
+// chrome-less Overlay drawn directly on top of the video inside the player
+// window. Using `overlay` (instead of `standaloneWindow`) means there is NO
+// separate window, NO title bar, and NO traffic-light buttons — a true
+// Spotlight/Raycast-style overlay. Builds the command list from the configured
+// search scope and runs the command the webview selects.
+//
+// Overlay caveats handled here:
+//  - The overlay is non-interactive until `setClickable(true)`; only elements
+//    marked `data-clickable` in the HTML receive input (see app.jsx).
+//  - The overlay lives inside the player window, so it only appears when a
+//    player window is open. That's fine for a playback command palette.
 
-const { standaloneWindow, menu, preferences, console } = iina;
+const { overlay, event, menu, preferences, console } = iina;
 const { buildCommandList } = require("./commands.js");
 
-// Point the standalone window at the bundled React UI (path is relative to the
-// plugin root). Configure it to look like a floating command palette.
-standaloneWindow.loadFile("dist/ui/window/index.html");
-standaloneWindow.setProperty({
-  title: "",
-  resizable: false,
-  hideTitleBar: true,
-  fullSizeContentView: true,
-});
-// The window is a transparent overlay canvas. The palette card is centered
-// inside it purely with CSS (flexbox), so it stays dead-center at ANY window
-// size — including resize/maximize — without the entry having to recompute a
-// frame. A dimmed backdrop fills the rest for the "overlay" feel. The native
-// traffic-light buttons (which the plugin API can't hide) land in the
-// transparent top-left margin where the card doesn't sit, so they recede.
-standaloneWindow.setFrame(900, 640);
+// Point the overlay at the bundled React UI (path relative to the plugin root).
+overlay.loadFile("dist/ui/window/index.html");
+// Enable interaction so the search field and result rows (marked data-clickable)
+// can receive clicks and keyboard input.
+overlay.setClickable(true);
+// Start hidden; toggled by the menu item / Cmd+K.
+overlay.hide();
 
 let isOpen = false;
+let overlayLoaded = false;
 // Latest id -> executor map, rebuilt every time we open the palette.
 let runMap = {};
+// If the user hits Cmd+K before the overlay webview finishes loading, remember
+// to push commands as soon as it signals ready.
+let pendingOpen = false;
 
 function readScope() {
   // "all" (default) or "bound" — see the preferences page.
@@ -34,22 +38,30 @@ function readScope() {
   return scope === "bound" ? "bound" : "all";
 }
 
-function openPalette() {
+function pushCommands() {
   const scope = readScope();
   const built = buildCommandList(scope);
   runMap = built.runMap;
+  overlay.postMessage("commands", { commands: built.commands, scope });
+}
 
-  // Send the (serializable) command list to the webview, then show it.
-  standaloneWindow.postMessage("commands", {
-    commands: built.commands,
-    scope,
-  });
-  standaloneWindow.open();
+function openPalette() {
+  if (!overlayLoaded) {
+    // Webview not ready yet; show it now and send commands on load.
+    pendingOpen = true;
+    overlay.show();
+    isOpen = true;
+    return;
+  }
+  pushCommands();
+  overlay.show();
+  // Tell the webview to (re)focus its search field.
+  overlay.postMessage("focus", {});
   isOpen = true;
 }
 
 function closePalette() {
-  standaloneWindow.close();
+  overlay.hide();
   isOpen = false;
 }
 
@@ -58,18 +70,32 @@ function togglePalette() {
   else openPalette();
 }
 
-// --- Webview -> entry messages -------------------------------------------
+// --- Overlay lifecycle ----------------------------------------------------
+
+// Fires when the overlay's HTML/JS has finished loading.
+event.on("iina.plugin-overlay-loaded", () => {
+  overlayLoaded = true;
+  if (pendingOpen) {
+    pendingOpen = false;
+    pushCommands();
+    overlay.postMessage("focus", {});
+  }
+});
+
+// --- Webview -> entry messages --------------------------------------------
 
 // The webview asks for a fresh command list (e.g. on its own load).
-standaloneWindow.onMessage("ready", () => {
-  const scope = readScope();
-  const built = buildCommandList(scope);
-  runMap = built.runMap;
-  standaloneWindow.postMessage("commands", { commands: built.commands, scope });
+overlay.onMessage("ready", () => {
+  overlayLoaded = true;
+  pushCommands();
+  if (pendingOpen) {
+    pendingOpen = false;
+    overlay.postMessage("focus", {});
+  }
 });
 
 // The user picked a command: run it, then close.
-standaloneWindow.onMessage("run", (data) => {
+overlay.onMessage("run", (data) => {
   const id = data && data.id;
   const run = id && runMap[id];
   closePalette();
@@ -84,8 +110,8 @@ standaloneWindow.onMessage("run", (data) => {
   }
 });
 
-// The user dismissed the palette (Esc / blur).
-standaloneWindow.onMessage("close", () => {
+// The user dismissed the palette (Esc / backdrop click).
+overlay.onMessage("close", () => {
   closePalette();
 });
 

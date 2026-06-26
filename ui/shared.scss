@@ -1,8 +1,10 @@
-// iina-cmd-menu — fully custom, dark, centered command-palette overlay.
+// iina-cmd-menu — fully custom, dark, chrome-less command-palette overlay.
 //
-// Layout model: the IINA standalone window is a transparent canvas. `.overlay`
-// fills it with a dimmed backdrop and centers `.card` via flexbox, so the
-// palette stays dead-center at ANY window size (resize / maximize) with no JS.
+// Rendered via IINA's Overlay API: this webview is drawn directly on top of the
+// video INSIDE the player window — no separate window, no title bar, no
+// traffic-light buttons. `.overlay` fills the player window with a dimmed
+// backdrop and centers `.card` via flexbox, so the palette stays dead-center at
+// ANY window size (resize / maximize / fullscreen) with no JS.
 
 * {
   box-sizing: border-box;
@@ -42,16 +44,12 @@ body.cmd-menu {
   background: rgba(0, 0, 0, 0.42);
   -webkit-backdrop-filter: blur(4px);
   backdrop-filter: blur(4px);
-  // Lets the user drag the window by the dark margin; also nudges macOS toward
-  // de-emphasizing the title-bar buttons over a borderless full-content view.
-  -webkit-app-region: drag;
 }
 
 // ---- Floating dark card ----------------------------------------------------
 // Tuned to IINA's own dark vibrancy UI: a deep translucent material (like
 // NSVisualEffectView .underWindowBackground) with a faint white inner edge.
 .card {
-  -webkit-app-region: no-drag; // interactive content shouldn't drag the window
   width: 100%;
   max-width: 600px;
   max-height: 100%;
