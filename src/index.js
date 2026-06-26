@@ -1,16 +1,22 @@
 // iina-cmd-menu — main entry
 //
-// Registers a Cmd+K menu item that toggles a command palette rendered in IINA's
-// SIDEBAR — the same docked panel as IINA's Video/Audio/Subtitles inspector.
-// The sidebar lives inside the player window (no separate window, no title bar,
-// no traffic-light buttons) and is fully interactive by default. Builds the
-// command list from the configured search scope and runs the selected command.
+// Registers a Cmd+K menu item that toggles a StandaloneWindow command palette,
+// builds the command list from the configured search scope, and runs the
+// command the webview selects.
 
-const { sidebar, menu, preferences, console } = iina;
+const { standaloneWindow, menu, preferences, console } = iina;
 const { buildCommandList } = require("./commands.js");
 
-// Point the sidebar tab at the bundled React UI (path relative to plugin root).
-sidebar.loadFile("dist/ui/window/index.html");
+// Point the standalone window at the bundled React UI (path is relative to the
+// plugin root). Configure it to look like a floating command palette.
+standaloneWindow.loadFile("dist/ui/window/index.html");
+standaloneWindow.setProperty({
+  title: "Command Menu",
+  resizable: false,
+  hideTitleBar: true,
+  fullSizeContentView: true,
+});
+standaloneWindow.setFrame(640, 420);
 
 let isOpen = false;
 // Latest id -> executor map, rebuilt every time we open the palette.
@@ -22,23 +28,22 @@ function readScope() {
   return scope === "bound" ? "bound" : "all";
 }
 
-function pushCommands() {
+function openPalette() {
   const scope = readScope();
   const built = buildCommandList(scope);
   runMap = built.runMap;
-  sidebar.postMessage("commands", { commands: built.commands, scope });
-}
 
-function openPalette() {
-  pushCommands();
-  sidebar.show();
-  // Ask the webview to clear + focus its search field.
-  sidebar.postMessage("focus", {});
+  // Send the (serializable) command list to the webview, then show it.
+  standaloneWindow.postMessage("commands", {
+    commands: built.commands,
+    scope,
+  });
+  standaloneWindow.open();
   isOpen = true;
 }
 
 function closePalette() {
-  sidebar.hide();
+  standaloneWindow.close();
   isOpen = false;
 }
 
@@ -47,15 +52,18 @@ function togglePalette() {
   else openPalette();
 }
 
-// --- Webview -> entry messages --------------------------------------------
+// --- Webview -> entry messages -------------------------------------------
 
 // The webview asks for a fresh command list (e.g. on its own load).
-sidebar.onMessage("ready", () => {
-  pushCommands();
+standaloneWindow.onMessage("ready", () => {
+  const scope = readScope();
+  const built = buildCommandList(scope);
+  runMap = built.runMap;
+  standaloneWindow.postMessage("commands", { commands: built.commands, scope });
 });
 
 // The user picked a command: run it, then close.
-sidebar.onMessage("run", (data) => {
+standaloneWindow.onMessage("run", (data) => {
   const id = data && data.id;
   const run = id && runMap[id];
   closePalette();
@@ -70,8 +78,8 @@ sidebar.onMessage("run", (data) => {
   }
 });
 
-// The user dismissed the palette (Esc).
-sidebar.onMessage("close", () => {
+// The user dismissed the palette (Esc / blur).
+standaloneWindow.onMessage("close", () => {
   closePalette();
 });
 
