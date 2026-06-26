@@ -7,9 +7,6 @@
     "name": "Pooya"
   },
   "entry": "dist/index.js",
-  "sidebarTab": {
-    "name": "⌘K Menu"
-  },
   "permissions": [
     "show-osd"
   ],
