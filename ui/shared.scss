@@ -1,3 +1,9 @@
+// iina-cmd-menu — fully custom, dark, centered command-palette overlay.
+//
+// Layout model: the IINA standalone window is a transparent canvas. `.overlay`
+// fills it with a dimmed backdrop and centers `.card` via flexbox, so the
+// palette stays dead-center at ANY window size (resize / maximize) with no JS.
+
 * {
   box-sizing: border-box;
 }
@@ -10,88 +16,182 @@ body {
 }
 
 body.cmd-menu {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen,
-    Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI",
+    Roboto, "Helvetica Neue", sans-serif;
   font-size: 14px;
-  color: #1f2023;
-  background: transparent; // window is borderless; palette draws its own surface
+  background: transparent; // window canvas is transparent; overlay paints itself
+  color: #f2f2f7;
   overflow: hidden;
   -webkit-user-select: none;
   user-select: none;
+  -webkit-font-smoothing: antialiased;
 }
 
 #root {
   height: 100%;
 }
 
-// ---- Palette surface -------------------------------------------------------
-.palette {
+// ---- Dimmed overlay backdrop -----------------------------------------------
+.overlay {
   height: 100%;
+  width: 100%;
+  display: flex;
+  align-items: center; // vertical centering
+  justify-content: center; // horizontal centering
+  padding: 48px 24px;
+  background: rgba(0, 0, 0, 0.42);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+  // Lets the user drag the window by the dark margin; also nudges macOS toward
+  // de-emphasizing the title-bar buttons over a borderless full-content view.
+  -webkit-app-region: drag;
+}
+
+// ---- Floating dark card ----------------------------------------------------
+.card {
+  -webkit-app-region: no-drag; // interactive content shouldn't drag the window
+  width: 100%;
+  max-width: 600px;
+  max-height: 100%;
   display: flex;
   flex-direction: column;
-  background: rgba(245, 245, 247, 0.92);
-  -webkit-backdrop-filter: blur(24px);
-  backdrop-filter: blur(24px);
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  border-radius: 12px;
+  background: rgba(30, 30, 34, 0.86);
+  -webkit-backdrop-filter: blur(40px) saturate(160%);
+  backdrop-filter: blur(40px) saturate(160%);
+  border: 0.5px solid rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
+  box-shadow:
+    0 24px 60px rgba(0, 0, 0, 0.55),
+    0 2px 8px rgba(0, 0, 0, 0.35),
+    inset 0 0.5px 0 rgba(255, 255, 255, 0.08);
   overflow: hidden;
 }
 
-.search {
+// ---- Search row ------------------------------------------------------------
+.search-row {
   flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 18px;
+  border-bottom: 0.5px solid rgba(255, 255, 255, 0.1);
+}
+
+.search-icon {
+  flex: 0 0 auto;
+  font-size: 17px;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.search {
+  flex: 1 1 auto;
+  min-width: 0;
   border: none;
   outline: none;
   background: transparent;
-  padding: 18px 20px;
-  font-size: 20px;
+  font-family: inherit;
+  font-size: 19px;
   font-weight: 400;
-  color: inherit;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  color: #ffffff;
+  -webkit-user-select: text;
+  user-select: text;
 
   &::placeholder {
-    color: rgba(0, 0, 0, 0.35);
+    color: rgba(255, 255, 255, 0.34);
   }
 }
 
+.clear {
+  flex: 0 0 auto;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+  font-size: 16px;
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.4);
+  transition: color 0.12s ease;
+
+  &:hover {
+    color: rgba(255, 255, 255, 0.75);
+  }
+}
+
+// ---- Results list ----------------------------------------------------------
 .results {
   flex: 1 1 auto;
   margin: 0;
-  padding: 6px;
+  padding: 8px;
   list-style: none;
   overflow-y: auto;
+  scrollbar-width: thin;
+
+  &::-webkit-scrollbar {
+    width: 8px;
+  }
+  &::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.16);
+    border-radius: 4px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+}
+
+// Category section header (only shown when unfiltered).
+.section {
+  padding: 10px 12px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgba(255, 255, 255, 0.38);
 }
 
 .row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 12px;
-  padding: 8px 12px;
-  border-radius: 8px;
+  padding: 9px 12px;
+  border-radius: 9px;
   cursor: pointer;
 
   &.active {
-    background: #0a64f0;
-    color: #fff;
+    background: linear-gradient(180deg, #0a84ff 0%, #0a6fe0 100%);
+    box-shadow: 0 2px 8px rgba(10, 132, 255, 0.4);
 
+    .glyph,
     .subtitle {
-      color: rgba(255, 255, 255, 0.8);
+      color: rgba(255, 255, 255, 0.82);
     }
-
+    .title {
+      color: #fff;
+    }
     .shortcut {
       background: rgba(255, 255, 255, 0.22);
       color: #fff;
+      border-color: rgba(255, 255, 255, 0.25);
     }
   }
+}
+
+.glyph {
+  flex: 0 0 auto;
+  width: 22px;
+  text-align: center;
+  font-size: 15px;
+  color: rgba(255, 255, 255, 0.5);
 }
 
 .labels {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  flex: 1 1 auto;
 }
 
 .title {
+  font-size: 14px;
+  color: #f2f2f7;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -99,7 +199,7 @@ body.cmd-menu {
 
 .subtitle {
   font-size: 11px;
-  color: rgba(0, 0, 0, 0.45);
+  color: rgba(255, 255, 255, 0.42);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -108,17 +208,19 @@ body.cmd-menu {
 .shortcut {
   flex: 0 0 auto;
   font-size: 12px;
+  font-weight: 500;
   padding: 2px 8px;
   border-radius: 6px;
-  background: rgba(0, 0, 0, 0.07);
-  color: rgba(0, 0, 0, 0.6);
+  background: rgba(255, 255, 255, 0.1);
+  border: 0.5px solid rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.72);
   white-space: nowrap;
 }
 
 .empty {
-  padding: 24px;
+  padding: 36px 24px;
   text-align: center;
-  color: rgba(0, 0, 0, 0.4);
+  color: rgba(255, 255, 255, 0.4);
 }
 
 // ---- Footer ----------------------------------------------------------------
@@ -126,67 +228,33 @@ body.cmd-menu {
   flex: 0 0 auto;
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 8px 14px;
+  gap: 18px;
+  padding: 9px 16px;
   font-size: 11px;
-  color: rgba(0, 0, 0, 0.5);
-  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  color: rgba(255, 255, 255, 0.45);
+  border-top: 0.5px solid rgba(255, 255, 255, 0.1);
+
+  .hint {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
 
   .count {
     margin-left: auto;
+    color: rgba(255, 255, 255, 0.38);
   }
 
   kbd {
     display: inline-block;
-    min-width: 16px;
+    min-width: 17px;
     text-align: center;
-    padding: 1px 4px;
-    margin-right: 2px;
+    padding: 1px 5px;
     font-family: inherit;
     font-size: 10px;
-    background: rgba(0, 0, 0, 0.08);
-    border-radius: 4px;
-  }
-}
-
-// ---- Dark mode -------------------------------------------------------------
-@media (prefers-color-scheme: dark) {
-  body.cmd-menu {
-    color: #dadada;
-  }
-
-  .palette {
-    background: rgba(40, 40, 43, 0.9);
-    border-color: rgba(255, 255, 255, 0.1);
-  }
-
-  .search {
-    border-bottom-color: rgba(255, 255, 255, 0.1);
-
-    &::placeholder {
-      color: rgba(255, 255, 255, 0.35);
-    }
-  }
-
-  .subtitle {
-    color: rgba(255, 255, 255, 0.45);
-  }
-
-  .shortcut {
-    background: rgba(255, 255, 255, 0.12);
     color: rgba(255, 255, 255, 0.7);
-  }
-
-  .empty {
-    color: rgba(255, 255, 255, 0.4);
-  }
-
-  .footer {
-    color: rgba(255, 255, 255, 0.5);
-    border-top-color: rgba(255, 255, 255, 0.1);
-
-    kbd {
-      background: rgba(255, 255, 255, 0.12);
-    }
+    background: rgba(255, 255, 255, 0.1);
+    border: 0.5px solid rgba(255, 255, 255, 0.12);
+    border-radius: 4px;
   }
 }
