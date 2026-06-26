@@ -11,12 +11,18 @@ const { buildCommandList } = require("./commands.js");
 // plugin root). Configure it to look like a floating command palette.
 standaloneWindow.loadFile("dist/ui/window/index.html");
 standaloneWindow.setProperty({
-  title: "Command Menu",
+  title: "",
   resizable: false,
   hideTitleBar: true,
   fullSizeContentView: true,
 });
-standaloneWindow.setFrame(640, 420);
+// The window is a transparent overlay canvas. The palette card is centered
+// inside it purely with CSS (flexbox), so it stays dead-center at ANY window
+// size — including resize/maximize — without the entry having to recompute a
+// frame. A dimmed backdrop fills the rest for the "overlay" feel. The native
+// traffic-light buttons (which the plugin API can't hide) land in the
+// transparent top-left margin where the card doesn't sit, so they recede.
+standaloneWindow.setFrame(900, 640);
 
 let isOpen = false;
 // Latest id -> executor map, rebuilt every time we open the palette.
