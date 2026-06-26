@@ -6,11 +6,11 @@
 // no traffic-light buttons) and is fully interactive by default. Builds the
 // command list from the configured search scope and runs the selected command.
 
-const { sidebarView, menu, preferences, console } = iina;
+const { sidebar, menu, preferences, console } = iina;
 const { buildCommandList } = require("./commands.js");
 
 // Point the sidebar tab at the bundled React UI (path relative to plugin root).
-sidebarView.loadFile("dist/ui/window/index.html");
+sidebar.loadFile("dist/ui/window/index.html");
 
 let isOpen = false;
 // Latest id -> executor map, rebuilt every time we open the palette.
@@ -26,19 +26,19 @@ function pushCommands() {
   const scope = readScope();
   const built = buildCommandList(scope);
   runMap = built.runMap;
-  sidebarView.postMessage("commands", { commands: built.commands, scope });
+  sidebar.postMessage("commands", { commands: built.commands, scope });
 }
 
 function openPalette() {
   pushCommands();
-  sidebarView.show();
+  sidebar.show();
   // Ask the webview to clear + focus its search field.
-  sidebarView.postMessage("focus", {});
+  sidebar.postMessage("focus", {});
   isOpen = true;
 }
 
 function closePalette() {
-  sidebarView.hide();
+  sidebar.hide();
   isOpen = false;
 }
 
@@ -50,12 +50,12 @@ function togglePalette() {
 // --- Webview -> entry messages --------------------------------------------
 
 // The webview asks for a fresh command list (e.g. on its own load).
-sidebarView.onMessage("ready", () => {
+sidebar.onMessage("ready", () => {
   pushCommands();
 });
 
 // The user picked a command: run it, then close.
-sidebarView.onMessage("run", (data) => {
+sidebar.onMessage("run", (data) => {
   const id = data && data.id;
   const run = id && runMap[id];
   closePalette();
@@ -71,7 +71,7 @@ sidebarView.onMessage("run", (data) => {
 });
 
 // The user dismissed the palette (Esc).
-sidebarView.onMessage("close", () => {
+sidebar.onMessage("close", () => {
   closePalette();
 });
 
