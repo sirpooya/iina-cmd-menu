@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Command Menu — Preferences</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      padding: 20px;
+      font-size: 13px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      color: #1f2023;
+    }
+    h2 { font-size: 15px; margin: 0 0 4px; }
+    .desc { color: rgba(0, 0, 0, 0.5); margin: 0 0 16px; line-height: 1.4; }
+    .option {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 12px;
+      border: 1px solid rgba(0, 0, 0, 0.1);
+      border-radius: 8px;
+      margin-bottom: 10px;
+      cursor: pointer;
+    }
+    .option input { margin-top: 2px; }
+    .option .label { font-weight: 600; }
+    .option .hint { color: rgba(0, 0, 0, 0.5); margin-top: 2px; line-height: 1.4; }
+    @media (prefers-color-scheme: dark) {
+      body { color: #dadada; }
+      .desc, .option .hint { color: rgba(255, 255, 255, 0.5); }
+      .option { border-color: rgba(255, 255, 255, 0.15); }
+    }
+  </style>
+</head>
+
+<body>
+  <h2>Search scope</h2>
+  <p class="desc">Which commands appear in the ⌘K palette.</p>
+
+  <label class="option">
+    <input type="radio" name="searchScope" value="all" />
+    <span>
+      <div class="label">All commands</div>
+      <div class="hint">Every mpv command plus IINA-native actions (PiP, music mode, …),
+        showing the bound shortcut if one exists.</div>
+    </span>
+  </label>
+
+  <label class="option">
+    <input type="radio" name="searchScope" value="bound" />
+    <span>
+      <div class="label">Only commands with a keyboard shortcut</div>
+      <div class="hint">Derived purely from your registered key bindings.</div>
+    </span>
+  </label>
+
+  <script>
+    // The preferences page can use the IINA preferences API directly.
+    var prefs = (window.iina && window.iina.preferences) || null;
+    var KEY = "searchScope";
+
+    function getScope() {
+      var v = prefs ? prefs.get(KEY) : null;
+      return v === "bound" ? "bound" : "all";
+    }
+
+    function setScope(v) {
+      if (!prefs) return;
+      prefs.set(KEY, v);
+      prefs.sync();
+    }
+
+    document.addEventListener("DOMContentLoaded", function () {
+      var current = getScope();
+      var radios = document.querySelectorAll('input[name="' + KEY + '"]');
+      radios.forEach(function (r) {
+        r.checked = r.value === current;
+        r.addEventListener("change", function () {
+          if (r.checked) setScope(r.value);
+        });
+      });
+    });
+  </script>
+</body>
+
+</html>
