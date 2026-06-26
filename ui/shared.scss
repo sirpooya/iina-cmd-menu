@@ -154,24 +154,25 @@ body.cmd-menu {
   align-items: center;
   gap: 12px;
   padding: 9px 12px;
-  border-radius: 9px;
+  border-radius: 8px;
   cursor: pointer;
 
+  // Selection uses the system accent (matching IINA's controlAccentColor),
+  // kept flat and calm like IINA's own selected rows rather than a loud gradient.
   &.active {
-    background: linear-gradient(180deg, #0a84ff 0%, #0a6fe0 100%);
-    box-shadow: 0 2px 8px rgba(10, 132, 255, 0.4);
+    background: #0a84ff;
 
     .glyph,
     .subtitle {
-      color: rgba(255, 255, 255, 0.82);
+      color: rgba(255, 255, 255, 0.85);
     }
     .title {
       color: #fff;
     }
     .shortcut {
-      background: rgba(255, 255, 255, 0.22);
+      background: rgba(255, 255, 255, 0.24);
       color: #fff;
-      border-color: rgba(255, 255, 255, 0.25);
+      border-color: rgba(255, 255, 255, 0.28);
     }
   }
 }
