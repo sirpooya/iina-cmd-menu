@@ -1,10 +1,9 @@
-// iina-cmd-menu — fully custom, dark, chrome-less command-palette overlay.
+// iina-cmd-menu — command palette rendered in IINA's SIDEBAR.
 //
-// Rendered via IINA's Overlay API: this webview is drawn directly on top of the
-// video INSIDE the player window — no separate window, no title bar, no
-// traffic-light buttons. `.overlay` fills the player window with a dimmed
-// backdrop and centers `.card` via flexbox, so the palette stays dead-center at
-// ANY window size (resize / maximize / fullscreen) with no JS.
+// Styled to match IINA's native inspector sidebar (the Video/Audio/Subtitles
+// panel). The webview fills the docked sidebar panel — no separate window, no
+// title bar, no traffic-light buttons. Colors are taken from IINA's own asset
+// catalog (SidebarTableBackground etc.) so it reads as native dark vibrancy.
 
 * {
   box-sizing: border-box;
@@ -18,10 +17,10 @@ body {
 }
 
 body.cmd-menu {
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI",
-    Roboto, "Helvetica Neue", sans-serif;
-  font-size: 14px;
-  background: transparent; // window canvas is transparent; overlay paints itself
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue",
+    sans-serif;
+  font-size: 13px;
+  background: transparent; // IINA paints the sidebar's vibrancy behind us
   color: #f2f2f7;
   overflow: hidden;
   -webkit-user-select: none;
@@ -33,54 +32,31 @@ body.cmd-menu {
   height: 100%;
 }
 
-// ---- Dimmed overlay backdrop -----------------------------------------------
-.overlay {
+// ---- Sidebar panel ---------------------------------------------------------
+.sidebar {
   height: 100%;
-  width: 100%;
-  display: flex;
-  align-items: center; // vertical centering
-  justify-content: center; // horizontal centering
-  padding: 48px 24px;
-  background: rgba(0, 0, 0, 0.42);
-  -webkit-backdrop-filter: blur(4px);
-  backdrop-filter: blur(4px);
-}
-
-// ---- Floating dark card ----------------------------------------------------
-// Tuned to IINA's own dark vibrancy UI: a deep translucent material (like
-// NSVisualEffectView .underWindowBackground) with a faint white inner edge.
-.card {
-  width: 100%;
-  max-width: 600px;
-  max-height: 100%;
   display: flex;
   flex-direction: column;
-  background: rgba(28, 28, 30, 0.82);
-  -webkit-backdrop-filter: blur(50px) saturate(180%);
-  backdrop-filter: blur(50px) saturate(180%);
-  border: 0.5px solid rgba(255, 255, 255, 0.1);
-  border-radius: 14px;
-  box-shadow:
-    0 22px 70px rgba(0, 0, 0, 0.6),
-    0 2px 10px rgba(0, 0, 0, 0.4),
-    inset 0 0.5px 0 rgba(255, 255, 255, 0.07);
-  overflow: hidden;
 }
 
 // ---- Search row ------------------------------------------------------------
+// A rounded search field like IINA's, sitting at the top of the panel.
 .search-row {
   flex: 0 0 auto;
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 16px 18px;
-  border-bottom: 0.5px solid rgba(255, 255, 255, 0.1);
+  gap: 7px;
+  margin: 12px 12px 8px;
+  padding: 6px 9px;
+  background: rgba(255, 255, 255, 0.08); // ~ SidebarTableBackground (dark)
+  border: 0.5px solid rgba(255, 255, 255, 0.1);
+  border-radius: 7px;
 }
 
 .search-icon {
   flex: 0 0 auto;
-  font-size: 17px;
-  color: rgba(255, 255, 255, 0.45);
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.4);
 }
 
 .search {
@@ -90,8 +66,7 @@ body.cmd-menu {
   outline: none;
   background: transparent;
   font-family: inherit;
-  font-size: 19px;
-  font-weight: 400;
+  font-size: 13px;
   color: #ffffff;
   -webkit-user-select: text;
   user-select: text;
@@ -107,10 +82,9 @@ body.cmd-menu {
   background: transparent;
   cursor: pointer;
   padding: 0;
-  font-size: 16px;
+  font-size: 13px;
   line-height: 1;
   color: rgba(255, 255, 255, 0.4);
-  transition: color 0.12s ease;
 
   &:hover {
     color: rgba(255, 255, 255, 0.75);
@@ -121,7 +95,7 @@ body.cmd-menu {
 .results {
   flex: 1 1 auto;
   margin: 0;
-  padding: 8px;
+  padding: 0 6px 6px;
   list-style: none;
   overflow-y: auto;
   scrollbar-width: thin;
@@ -137,31 +111,28 @@ body.cmd-menu {
   }
 }
 
-// Category section header (only shown when unfiltered).
+// Category section header — like the bold group labels in IINA's inspector.
 .section {
-  padding: 10px 12px 4px;
+  padding: 12px 8px 4px;
   font-size: 11px;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: rgba(255, 255, 255, 0.38);
+  color: rgba(255, 255, 255, 0.42);
 }
 
 .row {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 9px 12px;
-  border-radius: 8px;
+  gap: 9px;
+  padding: 6px 8px;
+  border-radius: 6px;
   cursor: pointer;
 
-  // Selection uses the system accent (matching IINA's controlAccentColor),
-  // kept flat and calm like IINA's own selected rows rather than a loud gradient.
+  // Selection uses the system accent, matching IINA's controlAccentColor —
+  // the same blue as the "Default" segment in the inspector screenshot.
   &.active {
     background: #0a84ff;
 
-    .glyph,
-    .subtitle {
+    .glyph {
       color: rgba(255, 255, 255, 0.85);
     }
     .title {
@@ -177,9 +148,9 @@ body.cmd-menu {
 
 .glyph {
   flex: 0 0 auto;
-  width: 22px;
+  width: 18px;
   text-align: center;
-  font-size: 15px;
+  font-size: 13px;
   color: rgba(255, 255, 255, 0.5);
 }
 
@@ -191,16 +162,8 @@ body.cmd-menu {
 }
 
 .title {
-  font-size: 14px;
+  font-size: 13px;
   color: #f2f2f7;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.subtitle {
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.42);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -208,10 +171,10 @@ body.cmd-menu {
 
 .shortcut {
   flex: 0 0 auto;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 500;
-  padding: 2px 8px;
-  border-radius: 6px;
+  padding: 1px 6px;
+  border-radius: 5px;
   background: rgba(255, 255, 255, 0.1);
   border: 0.5px solid rgba(255, 255, 255, 0.12);
   color: rgba(255, 255, 255, 0.72);
@@ -219,7 +182,7 @@ body.cmd-menu {
 }
 
 .empty {
-  padding: 36px 24px;
+  padding: 28px 16px;
   text-align: center;
   color: rgba(255, 255, 255, 0.4);
 }
@@ -229,16 +192,16 @@ body.cmd-menu {
   flex: 0 0 auto;
   display: flex;
   align-items: center;
-  gap: 18px;
-  padding: 9px 16px;
-  font-size: 11px;
+  gap: 12px;
+  padding: 7px 12px;
+  font-size: 10px;
   color: rgba(255, 255, 255, 0.45);
   border-top: 0.5px solid rgba(255, 255, 255, 0.1);
 
   .hint {
     display: inline-flex;
     align-items: center;
-    gap: 5px;
+    gap: 4px;
   }
 
   .count {
@@ -248,14 +211,14 @@ body.cmd-menu {
 
   kbd {
     display: inline-block;
-    min-width: 17px;
+    min-width: 15px;
     text-align: center;
-    padding: 1px 5px;
+    padding: 1px 4px;
     font-family: inherit;
-    font-size: 10px;
+    font-size: 9px;
     color: rgba(255, 255, 255, 0.7);
     background: rgba(255, 255, 255, 0.1);
     border: 0.5px solid rgba(255, 255, 255, 0.12);
-    border-radius: 4px;
+    border-radius: 3px;
   }
 }

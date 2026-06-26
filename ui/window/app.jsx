@@ -108,105 +108,85 @@ export default function App() {
   ]);
 
   return (
-    // Clicking the dimmed backdrop (outside the card) dismisses the palette.
-    <div
-      className="overlay"
-      data-clickable
-      onMouseDown={(e) => e.target === e.currentTarget && close()}
-    >
-      <div className="card" onKeyDown={onKeyDown}>
-        <div className="search-row">
-          <span className="search-icon" aria-hidden>
-            􀊫
-          </span>
-          <input
-            ref={inputRef}
-            className="search"
-            type="text"
-            autoFocus
-            spellCheck={false}
-            data-clickable
-            placeholder={
-              scope === "bound"
-                ? "Search commands with a shortcut…"
-                : "Search IINA commands…"
-            }
-            value={query}
-            onChange={(e) => {
-              setQuery(e.target.value);
+    // The sidebar panel itself; styled to match IINA's native inspector.
+    <div className="sidebar" onKeyDown={onKeyDown}>
+      <div className="search-row">
+        <span className="search-icon" aria-hidden>
+          􀊫
+        </span>
+        <input
+          ref={inputRef}
+          className="search"
+          type="text"
+          autoFocus
+          spellCheck={false}
+          placeholder={
+            scope === "bound"
+              ? "Search shortcuts…"
+              : "Search commands…"
+          }
+          value={query}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setActive(0);
+          }}
+        />
+        {query ? (
+          <button
+            className="clear"
+            tabIndex={-1}
+            onMouseDown={(e) => {
+              e.preventDefault();
+              setQuery("");
               setActive(0);
+              focusInput();
             }}
-          />
-          {query ? (
-            <button
-              className="clear"
-              data-clickable
-              tabIndex={-1}
-              onMouseDown={(e) => {
-                e.preventDefault();
-                setQuery("");
-                setActive(0);
-                focusInput();
-              }}
-              aria-label="Clear"
+            aria-label="Clear"
+          >
+            􀁡
+          </button>
+        ) : null}
+      </div>
+
+      <ul className="results" ref={listRef}>
+        {results.length === 0 && (
+          <li className="empty">No matching commands</li>
+        )}
+        {grouped.map((entry) =>
+          entry.type === "header" ? (
+            <li className="section" key={`h:${entry.label}`}>
+              {entry.label}
+            </li>
+          ) : (
+            <li
+              key={entry.cmd.id}
+              className={"row" + (entry.index === active ? " active" : "")}
+              onMouseMove={() => setActive(entry.index)}
+              onClick={() => runAt(entry.index)}
             >
-              􀁡
-            </button>
-          ) : null}
-        </div>
+              <span className="glyph" aria-hidden>
+                {categoryGlyph(entry.cmd.subtitle)}
+              </span>
+              <div className="labels">
+                <span className="title">{entry.cmd.title}</span>
+              </div>
+              {entry.cmd.shortcut ? (
+                <span className="shortcut">{entry.cmd.shortcut}</span>
+              ) : null}
+            </li>
+          ),
+        )}
+      </ul>
 
-        <ul className="results" ref={listRef}>
-          {results.length === 0 && (
-            <li className="empty">No matching commands</li>
-          )}
-          {grouped.map((entry) =>
-            entry.type === "header" ? (
-              <li className="section" key={`h:${entry.label}`}>
-                {entry.label}
-              </li>
-            ) : (
-              <li
-                key={entry.cmd.id}
-                className={"row" + (entry.index === active ? " active" : "")}
-                data-clickable
-                onMouseMove={() => setActive(entry.index)}
-                onClick={() => runAt(entry.index)}
-              >
-                <span className="glyph" aria-hidden>
-                  {categoryGlyph(entry.cmd.subtitle)}
-                </span>
-                <div className="labels">
-                  <span className="title">{entry.cmd.title}</span>
-                  {entry.cmd.subtitle ? (
-                    <span className="subtitle">{entry.cmd.subtitle}</span>
-                  ) : null}
-                </div>
-                {entry.cmd.shortcut ? (
-                  <span className="shortcut">{entry.cmd.shortcut}</span>
-                ) : null}
-              </li>
-            ),
-          )}
-        </ul>
-
-        <div className="footer">
-          <span className="hint">
-            <kbd>↑</kbd>
-            <kbd>↓</kbd>
-            <span>navigate</span>
-          </span>
-          <span className="hint">
-            <kbd>↵</kbd>
-            <span>run</span>
-          </span>
-          <span className="hint">
-            <kbd>esc</kbd>
-            <span>close</span>
-          </span>
-          <span className="count">
-            {results.length} {results.length === 1 ? "command" : "commands"}
-          </span>
-        </div>
+      <div className="footer">
+        <span className="hint">
+          <kbd>↑</kbd>
+          <kbd>↓</kbd> navigate
+        </span>
+        <span className="hint">
+          <kbd>↵</kbd> run
+        </span>
+        <span className="count">{results.length}</span>
       </div>
     </div>
   );
