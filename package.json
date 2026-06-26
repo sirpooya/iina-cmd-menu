@@ -1,0 +1,44 @@
+{
+  "name": "iina-cmd-menu",
+  "version": "1.0.0",
+  "description": "A command palette (Cmd+K overlay) for the IINA media player.",
+  "main": "src/index.js",
+  "scripts": {
+    "serve-window": "parcel serve ui/window/index.html --dist-dir dist/ui/window",
+    "build": "rm -rf dist && parcel build . && npm run copy-pref",
+    "copy-pref": "cp ui/pref.html dist/pref.html",
+    "dev": "rm -rf dist && npm run copy-pref && parcel watch .",
+    "link": "/Applications/IINA.app/Contents/MacOS/iina-plugin link .",
+    "unlink": "/Applications/IINA.app/Contents/MacOS/iina-plugin unlink .",
+    "pack": "/Applications/IINA.app/Contents/MacOS/iina-plugin pack ."
+  },
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@parcel/transformer-sass": "^2.8.3",
+    "iina-plugin-definition": "^0.0.7",
+    "prettier": "^2.8.8",
+    "process": "^0.11.10"
+  },
+  "dependencies": {
+    "parcel": "^2.8.3",
+    "parcel-optimizer-webview": "git+https://github.com/iina/parcel-optimizer-webview.git",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "browserslist": "safari >= 9",
+  "entry": "src/index.js",
+  "targets": {
+    "main": false,
+    "window": {
+      "distDir": "./dist/ui/window",
+      "source": "ui/window/index.html",
+      "publicUrl": "./"
+    },
+    "entry": {
+      "distDir": "./dist/",
+      "source": "src/index.js",
+      "isLibrary": false
+    }
+  }
+}
