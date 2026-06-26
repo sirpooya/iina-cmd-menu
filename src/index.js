@@ -1,36 +1,20 @@
 // iina-cmd-menu — main entry
 //
-// Registers a Cmd+K menu item that toggles a command palette rendered as a
-// chrome-less Overlay drawn directly on top of the video inside the player
-// window. Using `overlay` (instead of `standaloneWindow`) means there is NO
-// separate window, NO title bar, and NO traffic-light buttons — a true
-// Spotlight/Raycast-style overlay. Builds the command list from the configured
-// search scope and runs the command the webview selects.
-//
-// Overlay caveats handled here:
-//  - The overlay is non-interactive until `setClickable(true)`; only elements
-//    marked `data-clickable` in the HTML receive input (see app.jsx).
-//  - The overlay lives inside the player window, so it only appears when a
-//    player window is open. That's fine for a playback command palette.
+// Registers a Cmd+K menu item that toggles a command palette rendered in IINA's
+// SIDEBAR — the same docked panel as IINA's Video/Audio/Subtitles inspector.
+// The sidebar lives inside the player window (no separate window, no title bar,
+// no traffic-light buttons) and is fully interactive by default. Builds the
+// command list from the configured search scope and runs the selected command.
 
-const { overlay, event, menu, preferences, console } = iina;
+const { sidebarView, menu, preferences, console } = iina;
 const { buildCommandList } = require("./commands.js");
 
-// Point the overlay at the bundled React UI (path relative to the plugin root).
-overlay.loadFile("dist/ui/window/index.html");
-// Enable interaction so the search field and result rows (marked data-clickable)
-// can receive clicks and keyboard input.
-overlay.setClickable(true);
-// Start hidden; toggled by the menu item / Cmd+K.
-overlay.hide();
+// Point the sidebar tab at the bundled React UI (path relative to plugin root).
+sidebarView.loadFile("dist/ui/window/index.html");
 
 let isOpen = false;
-let overlayLoaded = false;
 // Latest id -> executor map, rebuilt every time we open the palette.
 let runMap = {};
-// If the user hits Cmd+K before the overlay webview finishes loading, remember
-// to push commands as soon as it signals ready.
-let pendingOpen = false;
 
 function readScope() {
   // "all" (default) or "bound" — see the preferences page.
@@ -42,26 +26,19 @@ function pushCommands() {
   const scope = readScope();
   const built = buildCommandList(scope);
   runMap = built.runMap;
-  overlay.postMessage("commands", { commands: built.commands, scope });
+  sidebarView.postMessage("commands", { commands: built.commands, scope });
 }
 
 function openPalette() {
-  if (!overlayLoaded) {
-    // Webview not ready yet; show it now and send commands on load.
-    pendingOpen = true;
-    overlay.show();
-    isOpen = true;
-    return;
-  }
   pushCommands();
-  overlay.show();
-  // Tell the webview to (re)focus its search field.
-  overlay.postMessage("focus", {});
+  sidebarView.show();
+  // Ask the webview to clear + focus its search field.
+  sidebarView.postMessage("focus", {});
   isOpen = true;
 }
 
 function closePalette() {
-  overlay.hide();
+  sidebarView.hide();
   isOpen = false;
 }
 
@@ -70,32 +47,15 @@ function togglePalette() {
   else openPalette();
 }
 
-// --- Overlay lifecycle ----------------------------------------------------
-
-// Fires when the overlay's HTML/JS has finished loading.
-event.on("iina.plugin-overlay-loaded", () => {
-  overlayLoaded = true;
-  if (pendingOpen) {
-    pendingOpen = false;
-    pushCommands();
-    overlay.postMessage("focus", {});
-  }
-});
-
 // --- Webview -> entry messages --------------------------------------------
 
 // The webview asks for a fresh command list (e.g. on its own load).
-overlay.onMessage("ready", () => {
-  overlayLoaded = true;
+sidebarView.onMessage("ready", () => {
   pushCommands();
-  if (pendingOpen) {
-    pendingOpen = false;
-    overlay.postMessage("focus", {});
-  }
 });
 
 // The user picked a command: run it, then close.
-overlay.onMessage("run", (data) => {
+sidebarView.onMessage("run", (data) => {
   const id = data && data.id;
   const run = id && runMap[id];
   closePalette();
@@ -110,8 +70,8 @@ overlay.onMessage("run", (data) => {
   }
 });
 
-// The user dismissed the palette (Esc / backdrop click).
-overlay.onMessage("close", () => {
+// The user dismissed the palette (Esc).
+sidebarView.onMessage("close", () => {
   closePalette();
 });
 
