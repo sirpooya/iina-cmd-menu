@@ -22,10 +22,15 @@ const { mpv, core, console } = iina;
 // These either aren't mpv commands, or are nicer to express via core.* /
 // a specific mpv command. `run` executes entry-side.
 // ---------------------------------------------------------------------------
+// `action` is the underlying mpv/iina command this maps to, used only to look
+// up a matching bound key shortcut (via input.getAllKeyBindings) so we can show
+// it as side text. It does NOT drive execution — `run` does. Leave `action`
+// off an entry that has no single equivalent command string.
 const IINA_ACTIONS = [
   {
     title: "Toggle Play / Pause",
     keywords: "play pause resume space",
+    action: "cycle pause",
     run: () => {
       if (core.status.paused) core.resume();
       else core.pause();
@@ -34,11 +39,13 @@ const IINA_ACTIONS = [
   {
     title: "Stop Playback",
     keywords: "stop halt",
+    action: "stop",
     run: () => core.stop(),
   },
   {
     title: "Toggle Picture-in-Picture",
     keywords: "pip picture in picture float",
+    action: "iina/toggle-pip",
     run: () => {
       core.window.pip = !core.window.pip;
     },
@@ -46,12 +53,14 @@ const IINA_ACTIONS = [
   {
     title: "Enter Music Mode (Mini Player)",
     keywords: "music mode mini player audio only",
+    action: "iina/music-mode",
     // Music mode has no core.* property in the API; it's an IINA input command.
     run: () => mpv.command("script-message-to", ["iina", "music-mode"]),
   },
   {
     title: "Toggle Fullscreen",
     keywords: "fullscreen full screen maximize",
+    action: "cycle fullscreen",
     run: () => {
       core.window.fullscreen = !core.window.fullscreen;
     },
@@ -59,6 +68,7 @@ const IINA_ACTIONS = [
   {
     title: "Toggle Always On Top",
     keywords: "ontop on top float pin",
+    action: "cycle ontop",
     run: () => {
       core.window.ontop = !core.window.ontop;
     },
@@ -66,6 +76,7 @@ const IINA_ACTIONS = [
   {
     title: "Toggle Mute",
     keywords: "mute unmute silence volume",
+    action: "cycle mute",
     run: () => {
       core.audio.muted = !core.audio.muted;
     },
@@ -73,6 +84,7 @@ const IINA_ACTIONS = [
   {
     title: "Volume Up",
     keywords: "volume louder up increase",
+    action: "add volume 5",
     run: () => {
       core.audio.volume = Math.min(core.audio.volume + 5, 130);
     },
@@ -80,6 +92,7 @@ const IINA_ACTIONS = [
   {
     title: "Volume Down",
     keywords: "volume quieter down decrease",
+    action: "add volume -5",
     run: () => {
       core.audio.volume = Math.max(core.audio.volume - 5, 0);
     },
@@ -87,6 +100,7 @@ const IINA_ACTIONS = [
   {
     title: "Show Playlist Sidebar",
     keywords: "playlist sidebar queue",
+    action: "iina/toggle-playlist-panel",
     run: () => {
       core.window.sidebar = "playlist";
     },
@@ -108,31 +122,37 @@ const IINA_ACTIONS = [
   {
     title: "Seek Forward 10s",
     keywords: "seek forward skip ahead 10",
+    action: "seek 10",
     run: () => core.seek(10, false),
   },
   {
     title: "Seek Backward 10s",
     keywords: "seek backward rewind back 10",
+    action: "seek -10",
     run: () => core.seek(-10, false),
   },
   {
     title: "Speed Up (1.25x step)",
     keywords: "speed faster rate",
+    action: "multiply speed 1.25",
     run: () => core.setSpeed(core.status.speed * 1.25),
   },
   {
     title: "Slow Down (0.8x step)",
     keywords: "speed slower rate",
+    action: "multiply speed 0.8",
     run: () => core.setSpeed(core.status.speed * 0.8),
   },
   {
     title: "Reset Speed (1x)",
     keywords: "speed normal reset rate",
+    action: "set speed 1",
     run: () => core.setSpeed(1),
   },
   {
     title: "Open File…",
     keywords: "open file load",
+    action: "iina/open-file",
     run: () => mpv.command("script-binding", ["iina/open-file"]),
   },
 ];
@@ -200,6 +220,21 @@ function getKeyBindings() {
   });
 }
 
+/**
+ * Normalize a command/action string for shortcut matching: lowercase, collapse
+ * runs of whitespace, and drop a leading "iina/" prefix. This lets a curated
+ * action ("cycle pause", "iina/music-mode") match a key binding's stored action
+ * string regardless of minor formatting/prefix differences.
+ */
+function normalizeAction(action) {
+  if (!action) return "";
+  return String(action)
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .replace(/^iina\//, "");
+}
+
 /** Normalize an mpv key code into a tidy display string, e.g. "Meta+k" -> "⌘K". */
 function prettyKey(key) {
   if (!key) return "";
@@ -232,11 +267,16 @@ function buildCommandList(scope) {
   const runMap = {};
 
   // Index bound shortcuts by their action string so we can show them in "all".
+  // We normalize the key (lowercase, collapse whitespace, drop a leading
+  // "iina/" prefix) so an action like "cycle pause" or "iina/music-mode"
+  // matches the binding regardless of minor formatting differences.
   const bindings = getKeyBindings();
   const shortcutByAction = {};
   for (const b of bindings) {
-    if (b.action && !shortcutByAction[b.action]) {
-      shortcutByAction[b.action] = prettyKey(b.key);
+    if (!b.action) continue;
+    const k = normalizeAction(b.action);
+    if (k && !shortcutByAction[k]) {
+      shortcutByAction[k] = prettyKey(b.key);
     }
   }
 
@@ -257,13 +297,14 @@ function buildCommandList(scope) {
     });
   } else {
     // Source 2: curated IINA actions first (most useful, hand-labeled).
+    // Show a shortcut if the user has a key bound to the same command.
     IINA_ACTIONS.forEach((a, i) => {
       const id = `iina:${i}`;
       commands.push({
         id,
         title: a.title,
         subtitle: "IINA action",
-        shortcut: "",
+        shortcut: a.action ? shortcutByAction[normalizeAction(a.action)] || "" : "",
         source: "iina",
       });
       runMap[id] = a.run;
@@ -276,7 +317,7 @@ function buildCommandList(scope) {
         id,
         title: c.name,
         subtitle: c.subtitle,
-        shortcut: shortcutByAction[c.name] || "",
+        shortcut: shortcutByAction[normalizeAction(c.name)] || "",
         source: "mpv",
         requiredArgCount: c.requiredArgCount,
       });
