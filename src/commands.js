@@ -1,34 +1,88 @@
 // command-source logic for iina-cmd-menu
 //
-// There is no single "all commands" API in IINA, so we combine three sources:
-//   1. mpv commands  -> mpv.getNative("command-list")
-//   2. IINA-native actions (PiP, music mode, ...) -> hand-curated static list
-//   3. Bound key bindings -> input.getAllKeyBindings()
+// The palette mirrors IINA's *menu bar* — the app-level actions a user sees in
+// Playback / Video / Audio / Subtitle / Window menus. IINA does not expose its
+// menu bar to plugins (menu.items() only returns this plugin's own items), and
+// the raw mpv "command-list" is low-level engine plumbing (quit, frame-step…)
+// that users don't recognize. So the list below is hand-curated to match what
+// IINA itself offers, and each item dispatches via the typed core.* API, an
+// IINA script-binding command, or an mpv command behind a friendly label.
+//
+// Two scopes:
+//   "all"   -> the curated IINA menu list below, each annotated with a bound
+//              key shortcut if the user has one for the same action.
+//   "bound" -> derived purely from the user's key bindings
+//              (input.getAllKeyBindings()).
 //
 // A "command" object handed to the palette has this shape:
 //   {
-//     id:      string   // stable unique id
-//     title:   string   // human label shown in the list
-//     subtitle:string   // secondary line (the underlying command / category)
-//     shortcut:string   // displayed key combo, or "" if none
-//     source: "mpv" | "iina" | "binding"
-//     run:    () => void   // executes the command (entry-side only; not serialized)
+//     id:       string   // stable unique id
+//     title:    string   // human label shown in the list
+//     subtitle: string   // secondary line (the IINA menu it lives under)
+//     shortcut: string   // displayed key combo, or "" if none
+//     source:  "iina" | "binding"
+//     run:     () => void   // executes the command (entry-side only; not serialized)
 //   }
 
 const { mpv, core, console } = iina;
 
+// Dispatch an IINA-native command (the things bound under "iina/..." keys),
+// e.g. "iina/open-file", "iina/toggle-pip". These are delivered as a script
+// message to IINA itself.
+function iinaCmd(name) {
+  mpv.command("script-binding", [name]);
+}
+
 // ---------------------------------------------------------------------------
-// Source 2: hand-curated IINA-native actions.
-// These either aren't mpv commands, or are nicer to express via core.* /
-// a specific mpv command. `run` executes entry-side.
+// The curated IINA menu-bar mirror.
+//
+// `category` is the IINA menu the item lives under (shown as the subtitle).
+// `action`  is the underlying mpv/iina command string used ONLY to look up a
+//           matching bound key shortcut for display — it does not drive `run`.
+// `run`     actually performs the action (entry-side).
 // ---------------------------------------------------------------------------
-// `action` is the underlying mpv/iina command this maps to, used only to look
-// up a matching bound key shortcut (via input.getAllKeyBindings) so we can show
-// it as side text. It does NOT drive execution — `run` does. Leave `action`
-// off an entry that has no single equivalent command string.
 const IINA_ACTIONS = [
+  // ---- File -------------------------------------------------------------
+  {
+    title: "Open File…",
+    category: "File",
+    keywords: "open file load browse",
+    action: "iina/open-file",
+    run: () => iinaCmd("iina/open-file"),
+  },
+  {
+    title: "Open URL…",
+    category: "File",
+    keywords: "open url network stream link",
+    action: "iina/open-url",
+    run: () => iinaCmd("iina/open-url"),
+  },
+  {
+    title: "New Window",
+    category: "File",
+    keywords: "new window",
+    action: "iina/new-window",
+    run: () => iinaCmd("iina/new-window"),
+  },
+  {
+    title: "Save Current Playlist…",
+    category: "File",
+    keywords: "save playlist export",
+    action: "iina/save-playlist",
+    run: () => iinaCmd("iina/save-playlist"),
+  },
+  {
+    title: "Take Screenshot",
+    category: "File",
+    keywords: "screenshot capture snap photo image",
+    action: "screenshot",
+    run: () => mpv.command("screenshot", []),
+  },
+
+  // ---- Playback ---------------------------------------------------------
   {
     title: "Toggle Play / Pause",
+    category: "Playback",
     keywords: "play pause resume space",
     action: "cycle pause",
     run: () => {
@@ -38,27 +92,97 @@ const IINA_ACTIONS = [
   },
   {
     title: "Stop Playback",
-    keywords: "stop halt",
+    category: "Playback",
+    keywords: "stop halt end",
     action: "stop",
     run: () => core.stop(),
   },
   {
-    title: "Toggle Picture-in-Picture",
-    keywords: "pip picture in picture float",
-    action: "iina/toggle-pip",
+    title: "Step Forward One Frame",
+    category: "Playback",
+    keywords: "frame step forward next advance",
+    action: "frame-step",
+    run: () => mpv.command("frame-step", []),
+  },
+  {
+    title: "Step Backward One Frame",
+    category: "Playback",
+    keywords: "frame step backward previous back",
+    action: "frame-back-step",
+    run: () => mpv.command("frame-back-step", []),
+  },
+  {
+    title: "Seek Forward 10s",
+    category: "Playback",
+    keywords: "seek forward skip ahead 10 jump",
+    action: "seek 10",
+    run: () => core.seek(10, false),
+  },
+  {
+    title: "Seek Backward 10s",
+    category: "Playback",
+    keywords: "seek backward rewind back 10 jump",
+    action: "seek -10",
+    run: () => core.seek(-10, false),
+  },
+  {
+    title: "Next in Playlist",
+    category: "Playback",
+    keywords: "next playlist skip track",
+    action: "playlist-next",
+    run: () => mpv.command("playlist-next", []),
+  },
+  {
+    title: "Previous in Playlist",
+    category: "Playback",
+    keywords: "previous playlist back track",
+    action: "playlist-prev",
+    run: () => mpv.command("playlist-prev", []),
+  },
+  {
+    title: "Speed Up (1.25×)",
+    category: "Playback",
+    keywords: "speed faster rate quicker",
+    action: "multiply speed 1.25",
+    run: () => core.setSpeed(core.status.speed * 1.25),
+  },
+  {
+    title: "Slow Down (0.8×)",
+    category: "Playback",
+    keywords: "speed slower rate",
+    action: "multiply speed 0.8",
+    run: () => core.setSpeed(core.status.speed * 0.8),
+  },
+  {
+    title: "Reset Speed (1×)",
+    category: "Playback",
+    keywords: "speed normal reset rate default",
+    action: "set speed 1",
+    run: () => core.setSpeed(1),
+  },
+  {
+    title: "Show Playlist Panel",
+    category: "Playback",
+    keywords: "playlist sidebar queue panel list",
+    action: "iina/toggle-playlist-panel",
     run: () => {
-      core.window.pip = !core.window.pip;
+      core.window.sidebar = "playlist";
     },
   },
   {
-    title: "Enter Music Mode (Mini Player)",
-    keywords: "music mode mini player audio only",
-    action: "iina/music-mode",
-    // Music mode has no core.* property in the API; it's an IINA input command.
-    run: () => mpv.command("script-message-to", ["iina", "music-mode"]),
+    title: "Show Chapters Panel",
+    category: "Playback",
+    keywords: "chapters sidebar panel",
+    action: "iina/toggle-chapters-panel",
+    run: () => {
+      core.window.sidebar = "chapters";
+    },
   },
+
+  // ---- Video ------------------------------------------------------------
   {
     title: "Toggle Fullscreen",
+    category: "Video",
     keywords: "fullscreen full screen maximize",
     action: "cycle fullscreen",
     run: () => {
@@ -66,15 +190,68 @@ const IINA_ACTIONS = [
     },
   },
   {
-    title: "Toggle Always On Top",
-    keywords: "ontop on top float pin",
-    action: "cycle ontop",
+    title: "Toggle Picture-in-Picture",
+    category: "Video",
+    keywords: "pip picture in picture float overlay",
+    action: "iina/toggle-pip",
     run: () => {
-      core.window.ontop = !core.window.ontop;
+      core.window.pip = !core.window.pip;
     },
   },
   {
+    title: "Enter Music Mode (Mini Player)",
+    category: "Video",
+    keywords: "music mode mini player audio only compact",
+    action: "iina/music-mode",
+    run: () => mpv.command("script-message-to", ["iina", "music-mode"]),
+  },
+  {
+    title: "Rotate Video 90°",
+    category: "Video",
+    keywords: "rotate turn orientation 90 clockwise",
+    action: "cycle-values video-rotate 90 180 270 0",
+    run: () => mpv.command("cycle-values", ["video-rotate", "90", "180", "270", "0"]),
+  },
+  {
+    title: "Aspect Ratio: 16:9",
+    category: "Video",
+    keywords: "aspect ratio widescreen 16 9",
+    action: "set video-aspect-override 16:9",
+    run: () => mpv.set("video-aspect-override", "16:9"),
+  },
+  {
+    title: "Aspect Ratio: 4:3",
+    category: "Video",
+    keywords: "aspect ratio fullscreen classic 4 3",
+    action: "set video-aspect-override 4:3",
+    run: () => mpv.set("video-aspect-override", "4:3"),
+  },
+  {
+    title: "Aspect Ratio: Default",
+    category: "Video",
+    keywords: "aspect ratio default reset original",
+    action: "set video-aspect-override -1",
+    run: () => mpv.set("video-aspect-override", "-1"),
+  },
+  {
+    title: "Flip Vertically",
+    category: "Video",
+    keywords: "flip vertical mirror upside down vflip",
+    action: "vf toggle vflip",
+    run: () => mpv.command("vf", ["toggle", "vflip"]),
+  },
+  {
+    title: "Flip Horizontally",
+    category: "Video",
+    keywords: "flip horizontal mirror hflip",
+    action: "vf toggle hflip",
+    run: () => mpv.command("vf", ["toggle", "hflip"]),
+  },
+
+  // ---- Audio ------------------------------------------------------------
+  {
     title: "Toggle Mute",
+    category: "Audio",
     keywords: "mute unmute silence volume",
     action: "cycle mute",
     run: () => {
@@ -83,6 +260,7 @@ const IINA_ACTIONS = [
   },
   {
     title: "Volume Up",
+    category: "Audio",
     keywords: "volume louder up increase",
     action: "add volume 5",
     run: () => {
@@ -91,108 +269,122 @@ const IINA_ACTIONS = [
   },
   {
     title: "Volume Down",
-    keywords: "volume quieter down decrease",
+    category: "Audio",
+    keywords: "volume quieter down decrease lower",
     action: "add volume -5",
     run: () => {
       core.audio.volume = Math.max(core.audio.volume - 5, 0);
     },
   },
   {
-    title: "Show Playlist Sidebar",
-    keywords: "playlist sidebar queue",
-    action: "iina/toggle-playlist-panel",
+    title: "Audio Delay +0.1s",
+    category: "Audio",
+    keywords: "audio delay sync offset later",
+    action: "add audio-delay 0.1",
     run: () => {
-      core.window.sidebar = "playlist";
+      core.audio.delay = core.audio.delay + 0.1;
     },
   },
   {
-    title: "Show Chapters Sidebar",
-    keywords: "chapters sidebar",
+    title: "Audio Delay −0.1s",
+    category: "Audio",
+    keywords: "audio delay sync offset earlier",
+    action: "add audio-delay -0.1",
     run: () => {
-      core.window.sidebar = "chapters";
+      core.audio.delay = core.audio.delay - 0.1;
+    },
+  },
+  {
+    title: "Reset Audio Delay",
+    category: "Audio",
+    keywords: "audio delay sync reset zero",
+    action: "set audio-delay 0",
+    run: () => {
+      core.audio.delay = 0;
+    },
+  },
+  {
+    title: "Cycle Audio Track",
+    category: "Audio",
+    keywords: "audio track language switch next",
+    action: "cycle audio",
+    run: () => mpv.command("cycle", ["audio"]),
+  },
+
+  // ---- Subtitle ---------------------------------------------------------
+  {
+    title: "Toggle Subtitles",
+    category: "Subtitle",
+    keywords: "subtitle captions toggle show hide visibility",
+    action: "cycle sub-visibility",
+    run: () => mpv.command("cycle", ["sub-visibility"]),
+  },
+  {
+    title: "Cycle Subtitle Track",
+    category: "Subtitle",
+    keywords: "subtitle track language switch next",
+    action: "cycle sub",
+    run: () => mpv.command("cycle", ["sub"]),
+  },
+  {
+    title: "Load External Subtitle…",
+    category: "Subtitle",
+    keywords: "subtitle load external file srt add",
+    action: "iina/open-sub",
+    run: () => iinaCmd("iina/open-sub"),
+  },
+  {
+    title: "Subtitle Delay +0.1s",
+    category: "Subtitle",
+    keywords: "subtitle delay sync offset later",
+    action: "add sub-delay 0.1",
+    run: () => {
+      core.subtitle.delay = core.subtitle.delay + 0.1;
+    },
+  },
+  {
+    title: "Subtitle Delay −0.1s",
+    category: "Subtitle",
+    keywords: "subtitle delay sync offset earlier",
+    action: "add sub-delay -0.1",
+    run: () => {
+      core.subtitle.delay = core.subtitle.delay - 0.1;
+    },
+  },
+  {
+    title: "Reset Subtitle Delay",
+    category: "Subtitle",
+    keywords: "subtitle delay sync reset zero",
+    action: "set sub-delay 0",
+    run: () => {
+      core.subtitle.delay = 0;
+    },
+  },
+
+  // ---- Window -----------------------------------------------------------
+  {
+    title: "Toggle Always On Top",
+    category: "Window",
+    keywords: "ontop on top float pin above",
+    action: "cycle ontop",
+    run: () => {
+      core.window.ontop = !core.window.ontop;
     },
   },
   {
     title: "Hide Sidebar",
+    category: "Window",
     keywords: "hide sidebar close panel",
+    action: "iina/hide-sidebar",
     run: () => {
       core.window.sidebar = null;
     },
   },
-  {
-    title: "Seek Forward 10s",
-    keywords: "seek forward skip ahead 10",
-    action: "seek 10",
-    run: () => core.seek(10, false),
-  },
-  {
-    title: "Seek Backward 10s",
-    keywords: "seek backward rewind back 10",
-    action: "seek -10",
-    run: () => core.seek(-10, false),
-  },
-  {
-    title: "Speed Up (1.25x step)",
-    keywords: "speed faster rate",
-    action: "multiply speed 1.25",
-    run: () => core.setSpeed(core.status.speed * 1.25),
-  },
-  {
-    title: "Slow Down (0.8x step)",
-    keywords: "speed slower rate",
-    action: "multiply speed 0.8",
-    run: () => core.setSpeed(core.status.speed * 0.8),
-  },
-  {
-    title: "Reset Speed (1x)",
-    keywords: "speed normal reset rate",
-    action: "set speed 1",
-    run: () => core.setSpeed(1),
-  },
-  {
-    title: "Open File…",
-    keywords: "open file load",
-    action: "iina/open-file",
-    run: () => mpv.command("script-binding", ["iina/open-file"]),
-  },
 ];
 
 // ---------------------------------------------------------------------------
-// Source 1: mpv commands, enumerated at runtime.
-// command-list is an array of { name, args: [{ name, type, optional }] }.
-// We surface the *name*; most take args, so running them bare is best-effort
-// (mpv uses defaults / no-ops where it can). We only auto-run no-arg commands.
-// ---------------------------------------------------------------------------
-function getMpvCommands() {
-  let list;
-  try {
-    list = mpv.getNative("command-list");
-  } catch (e) {
-    console.error("Failed to read mpv command-list: " + e);
-    return [];
-  }
-  if (!Array.isArray(list)) return [];
-
-  return list
-    .filter((c) => c && typeof c.name === "string")
-    .map((c) => {
-      const args = Array.isArray(c.args) ? c.args : [];
-      const required = args.filter((a) => a && !a.optional);
-      const argSummary = args
-        .map((a) => (a && a.optional ? `[${a.name}]` : a && a.name) || "")
-        .filter(Boolean)
-        .join(" ");
-      return {
-        name: c.name,
-        requiredArgCount: required.length,
-        subtitle: argSummary ? `mpv: ${c.name} ${argSummary}` : `mpv: ${c.name}`,
-        keywords: `mpv ${c.name} ${argSummary}`,
-      };
-    });
-}
-
-// ---------------------------------------------------------------------------
-// Source 3: bound key bindings.
+// Bound key bindings (used both for the "bound" scope and to annotate the
+// curated list with shortcuts).
 // input.getAllKeyBindings() -> Record<keyCode, { key, action, isIINACommand, comment }>
 // Missing in older type defs but present at runtime in IINA 1.4.x; guarded.
 // ---------------------------------------------------------------------------
@@ -255,9 +447,9 @@ function prettyKey(key) {
  * Build the command list to send to the palette webview.
  *
  * @param {"all"|"bound"} scope
- *   "all"   = merged mpv (source 1) + curated IINA actions (source 2),
- *             annotated with any matching bound shortcut.
- *   "bound" = derived purely from key bindings (source 3).
+ *   "all"   = the curated IINA menu-bar mirror, annotated with any matching
+ *             bound shortcut.
+ *   "bound" = derived purely from key bindings.
  * @returns {{ commands: object[], runMap: Object<string, () => void> }}
  *   `commands` is JSON-serializable (no functions) for postMessage;
  *   `runMap` maps id -> executor, kept entry-side only.
@@ -266,10 +458,8 @@ function buildCommandList(scope) {
   const commands = [];
   const runMap = {};
 
-  // Index bound shortcuts by their action string so we can show them in "all".
-  // We normalize the key (lowercase, collapse whitespace, drop a leading
-  // "iina/" prefix) so an action like "cycle pause" or "iina/music-mode"
-  // matches the binding regardless of minor formatting differences.
+  // Index bound shortcuts by their normalized action string so we can show
+  // them next to the matching curated item.
   const bindings = getKeyBindings();
   const shortcutByAction = {};
   for (const b of bindings) {
@@ -281,7 +471,7 @@ function buildCommandList(scope) {
   }
 
   if (scope === "bound") {
-    // Source 3 only.
+    // Source: the user's key bindings only.
     bindings.forEach((b, i) => {
       if (!b.action) return;
       const id = `binding:${i}`;
@@ -296,43 +486,17 @@ function buildCommandList(scope) {
       runMap[id] = () => runRawCommand(b.action, b.isIINACommand);
     });
   } else {
-    // Source 2: curated IINA actions first (most useful, hand-labeled).
-    // Show a shortcut if the user has a key bound to the same command.
+    // The curated IINA menu-bar mirror, annotated with bound shortcuts.
     IINA_ACTIONS.forEach((a, i) => {
       const id = `iina:${i}`;
       commands.push({
         id,
         title: a.title,
-        subtitle: "IINA action",
+        subtitle: a.category,
         shortcut: a.action ? shortcutByAction[normalizeAction(a.action)] || "" : "",
         source: "iina",
       });
       runMap[id] = a.run;
-    });
-
-    // Source 1: mpv commands, annotated with a bound shortcut if one exists.
-    getMpvCommands().forEach((c) => {
-      const id = `mpv:${c.name}`;
-      commands.push({
-        id,
-        title: c.name,
-        subtitle: c.subtitle,
-        shortcut: shortcutByAction[normalizeAction(c.name)] || "",
-        source: "mpv",
-        requiredArgCount: c.requiredArgCount,
-      });
-      runMap[id] = () => {
-        if (c.requiredArgCount > 0) {
-          core.osd(`“${c.name}” needs ${c.requiredArgCount} argument(s); run via a binding.`);
-          return;
-        }
-        try {
-          mpv.command(c.name, []);
-        } catch (e) {
-          console.error(`mpv command ${c.name} failed: ${e}`);
-          core.osd(`Command failed: ${c.name}`);
-        }
-      };
     });
   }
 
