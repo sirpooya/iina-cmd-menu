@@ -1,5 +1,5 @@
 {
-  "name": "Command Menu",
+  "name": "⌘K Menu",
   "identifier": "com.pooya.iina-cmd-menu",
   "version": "1.0.0",
   "description": "A command palette (Cmd+K overlay) for IINA, like the command palette in VS Code, Linear, or Figma.",
